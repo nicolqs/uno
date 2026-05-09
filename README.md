@@ -1,6 +1,6 @@
 # UNO
 
-A real-time multiplayer UNO card game you run on your laptop and play from your phones over local Wi-Fi.
+A real-time multiplayer UNO card game. Play locally over Wi-Fi or deploy to Cloudflare Workers for free, anywhere-on-the-internet play.
 
 ![Host display](docs/screenshots/01-host.png)
 
@@ -18,30 +18,47 @@ A real-time multiplayer UNO card game you run on your laptop and play from your 
 
 | | |
 |---|---|
-| Runtime | [Bun](https://bun.sh) |
-| Server | [Hono](https://hono.dev) |
-| Realtime | Native WebSocket |
+| Server | [Cloudflare Workers](https://workers.cloudflare.com/) + [Durable Objects](https://developers.cloudflare.com/durable-objects/) (WebSocket Hibernation API) |
 | Frontend | React 19 + Vite 6 + TypeScript |
 | Styling | Tailwind v4 + custom CSS for cards |
+| Static hosting | Workers Assets (single deploy) |
 | Lint/format | [Biome](https://biomejs.dev) |
 
-## Quick start
+## Run locally
+
+Wrangler requires Node ≥22. macOS Homebrew Node works (`/opt/homebrew/bin/node`).
 
 ```bash
 bun install
-bun start
+bun run preview        # builds + runs the Worker locally on :3000
 ```
 
-The terminal prints the QR code and two URLs:
+Open `http://localhost:3000/host` on your laptop, scan the QR with your phone (same Wi-Fi).
 
-```
-Host display:  http://192.168.x.x:3000/host
-Players join:  http://192.168.x.x:3000/
+For hot-reload on the React side, use `bun run dev` (Vite at :5173 with `/ws` proxy to wrangler dev at :3000).
+
+## Deploy to Cloudflare (free tier)
+
+```bash
+bun run cf:login       # opens browser to auth your Cloudflare account
+bun run deploy         # builds + uploads Worker + static assets
 ```
 
-1. Open the host URL on your laptop in a browser (the **table** view with the QR).
-2. On every phone (same Wi-Fi): scan the QR, type a name, tap **Join**.
-3. Once at least 2 players are in, anyone taps **Start game**.
+That's it. You get a `https://uno.<your-subdomain>.workers.dev` URL. Bind a custom domain via the Cloudflare dashboard if you want.
+
+**Free tier covers this comfortably:**
+- 100k requests/day (each WS message ≈ 1/20th of a request)
+- 13k GB-seconds/day duration — idle WebSockets are **free** thanks to the Hibernation API
+- 5 GB SQLite storage — game state stays in-memory, doesn't touch storage
+
+## Rules
+
+Standard UNO (108-card deck). Two house tweaks active:
+
+- **Stacking** +2 / +4 (a +2 onto a +2, a +4 onto a +4) — chain accumulates until someone draws.
+- **Draw-and-play-if-matches** — when you can't play, you draw 1; if it matches you may play it immediately.
+
+Wild Draw Four challenge is off; first-flip action cards are reshuffled until a number turns up. First to 500 points wins.
 
 ## Screenshots
 
@@ -53,38 +70,36 @@ Players join:  http://192.168.x.x:3000/
 |:---:|
 | ![Host playing](docs/screenshots/05-host-playing.png) |
 
-## Rules
-
-Standard UNO (108-card deck). Two house tweaks active:
-
-- **Stacking** +2 / +4 (a +2 onto a +2, a +4 onto a +4) — chain accumulates until someone draws.
-- **Draw-and-play-if-matches** — when you can't play, you draw 1; if it matches you may play it immediately.
-
-Wild Draw Four challenge is off; first-flip action cards are reshuffled until a number turns up. First to 500 points wins.
-
 ## Scripts
 
 ```bash
-bun dev          # vite dev server + bun --watch on the server
-bun start        # vite build + serve dist/ + WebSocket on :3000
-bun run build    # production build
+bun run dev          # Vite + wrangler dev (HMR)
+bun run preview      # build + run Worker locally
+bun run build        # production build
+bun run deploy       # build + push to Cloudflare
+bun run cf:login     # Cloudflare auth
 bun run typecheck
-bun run check    # biome lint + format
+bun run check        # biome lint + format
 ```
 
 ## Project layout
 
 ```
-server/   ── deck.ts, rules.ts, game.ts, server.ts (Hono + Bun WS)
-src/      ── React app (player + host screens) + shared types + native WS client
-docs/     ── screenshots
+worker/
+  index.ts         ── Worker entry: routes /ws to the Durable Object
+  game-room.ts     ── DurableObject class with WebSocket Hibernation
+server/
+  deck.ts, rules.ts, game.ts, types.ts   ── pure game logic (Worker imports)
+src/
+  React app (player + host screens) + native WS client
+wrangler.toml      ── Cloudflare config + DO binding + Assets binding
 ```
 
-## Stuck?
+## Caveats
 
-- Both `/host` and the join page have a **Reset** button if a previous session left phantom seats.
-- Default port is `3000` — set `PORT=4000 bun start` to change.
-- Phones must be on the **same Wi-Fi** as the laptop. Captive-portal Wi-Fi (hotels, conferences) often blocks LAN-to-LAN.
+- **Single shared room.** Anyone hitting the URL joins the same game. Great for "send the URL to 3 friends" — bad for public sharing. Add room codes if you need multi-game support.
+- **In-memory state.** Durable Objects can be evicted after long idleness, which would reset the game. Hibernation keeps state through normal pauses (turns, mid-game phone-swap). For persistence, write `game` fields to `state.storage`.
+- **Reset button** on `/host` and the join screen clears stuck sessions.
 
 ## License
 

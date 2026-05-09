@@ -1,12 +1,25 @@
-import { useState } from 'react';
+import qrcode from 'qrcode';
+import { useEffect, useState } from 'react';
 import { newGame, nextRound, playAgain, startGame } from '../socket';
 import type { GameState, Phase } from '../types';
 import Card from './Card';
 
 export default function HostScreen({ state }: { state: GameState }) {
-  const lan = state.lan || { qrDataUrl: '', playerUrl: '' };
-  const qrSrc = lan.qrDataUrl || '';
-  const playerUrl = lan.playerUrl || `${window.location.origin}/`;
+  const playerUrl = state.lan?.playerUrl || `${window.location.origin}/`;
+  const [qrSrc, setQrSrc] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    qrcode
+      .toDataURL(playerUrl, { width: 320, margin: 1 })
+      .then((url) => {
+        if (!cancelled) setQrSrc(url);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [playerUrl]);
 
   return (
     <div className="host-grid grid grid-cols-[1fr_320px] grid-rows-1 h-dvh p-4 gap-4">

@@ -4,9 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n vite,server -c cyan,magenta \"vite\" \"bun --watch run server/server.ts\"",
+    "dev": "concurrently -k -n vite,worker -c cyan,magenta \"vite\" \"wrangler dev\"",
     "build": "vite build",
-    "start": "vite build && bun run server/server.ts",
+    "preview": "vite build && wrangler dev",
+    "deploy": "vite build && wrangler deploy",
+    "cf:login": "wrangler login",
+    "cf:whoami": "wrangler whoami",
     "typecheck": "tsc --noEmit",
     "format": "biome format --write .",
     "lint": "biome lint .",
@@ -20,6 +23,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@cloudflare/workers-types": "^4.20260509.1",
     "@tailwindcss/vite": "^4.0.0",
     "@types/bun": "^1.1.13",
     "@types/qrcode": "^1.5.5",
@@ -29,6 +33,7 @@
     "concurrently": "^9.1.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2",
-    "vite": "^6.0.3"
+    "vite": "^6.0.3",
+    "wrangler": "^4.90.0"
   }
 }

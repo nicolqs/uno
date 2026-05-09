@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { buildDeck, shuffle, cardPoints, isWild, isNumber, COLORS } from './deck.ts';
 import { canPlayCard } from './rules.ts';
 import type {
@@ -71,7 +70,7 @@ export class GameRoom {
     }
     if (this.players.length >= 10) return { error: 'Game is full (10 players max)' };
     const player: Player = {
-      id: randomUUID(),
+      id: crypto.randomUUID(),
       name: trimmed,
       socketId,
       connected: true,

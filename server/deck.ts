@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import type { Card, CardColor, CardValue } from './types.ts';
 
 export const COLORS: CardColor[] = ['red', 'yellow', 'green', 'blue'];
@@ -23,7 +22,7 @@ export function buildDeck(): Card[] {
 }
 
 function makeCard(color: CardColor, value: CardValue): Card {
-  return { id: randomUUID(), color, value };
+  return { id: crypto.randomUUID(), color, value };
 }
 
 export function shuffle<T>(arr: T[]): T[] {

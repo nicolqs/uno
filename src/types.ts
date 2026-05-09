@@ -29,7 +29,6 @@ export interface LanInfo {
   lan: string;
   playerUrl: string;
   hostUrl?: string;
-  qrDataUrl: string;
 }
 
 export interface GameState {
