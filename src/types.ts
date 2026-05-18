@@ -21,6 +21,7 @@ export interface RedactedPlayer {
 }
 
 export interface GameEvent {
+  id: number;
   ts: number;
   text: string;
 }

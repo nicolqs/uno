@@ -7,6 +7,8 @@ interface SocketAttachment {
   playerId: string | null;
 }
 
+const STORAGE_KEY = 'game/v1';
+
 export class GameRoom {
   state: DurableObjectState;
   env: Env;
@@ -17,6 +19,20 @@ export class GameRoom {
     this.state = state;
     this.env = env;
     this.game = new GameLogic();
+    this.state.blockConcurrencyWhile(async () => {
+      const stored = await this.state.storage.get(STORAGE_KEY);
+      if (stored) this.game.restore(stored as Parameters<GameLogic['restore']>[0]);
+      const alive = new Set<string>();
+      for (const ws of this.state.getWebSockets()) {
+        const data = ws.deserializeAttachment() as SocketAttachment | undefined;
+        if (data?.socketId) alive.add(data.socketId);
+      }
+      this.game.syncConnectivity(alive);
+    });
+  }
+
+  async persist(): Promise<void> {
+    await this.state.storage.put(STORAGE_KEY, this.game.snapshot());
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -45,16 +61,17 @@ export class GameRoom {
     };
   }
 
-  webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): void {
+  async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): Promise<void> {
     const text = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
     const data = ws.deserializeAttachment() as SocketAttachment;
-    this.handleMessage(ws, data, text);
+    await this.handleMessage(ws, data, text);
   }
 
-  webSocketClose(ws: WebSocket): void {
+  async webSocketClose(ws: WebSocket): Promise<void> {
     const data = ws.deserializeAttachment() as SocketAttachment;
     this.game.removeBySocket(data.socketId);
     this.broadcast();
+    await this.persist();
   }
 
   webSocketError(): void {
@@ -74,7 +91,7 @@ export class GameRoom {
     }
   }
 
-  handleMessage(ws: WebSocket, data: SocketAttachment, raw: string): void {
+  async handleMessage(ws: WebSocket, data: SocketAttachment, raw: string): Promise<void> {
     let msg: ClientMessage;
     try {
       msg = JSON.parse(raw) as ClientMessage;
@@ -90,10 +107,21 @@ export class GameRoom {
 
     switch (msg.type) {
       case 'hello': {
+        if (data.playerId) {
+          const relinked = this.game.relinkSocket(data.playerId, data.socketId);
+          if (!relinked) {
+            data.playerId = null;
+            persistAttachment();
+          }
+        }
         const s = this.game.redactedStateFor(data.playerId);
         if (this.lanInfo) s.lan = this.lanInfo;
         this.send(ws, { type: 'state', state: s });
         reply({ ok: true });
+        if (data.playerId) {
+          this.broadcast();
+          await this.persist();
+        }
         return;
       }
       case 'join': {
@@ -104,6 +132,7 @@ export class GameRoom {
         }
         reply(result);
         this.broadcast();
+        await this.persist();
         return;
       }
       case 'rejoin': {
@@ -114,53 +143,63 @@ export class GameRoom {
         }
         reply(result);
         this.broadcast();
+        await this.persist();
         return;
       }
       case 'startGame': {
         reply(this.game.startGame());
         this.broadcast();
+        await this.persist();
         return;
       }
       case 'playCard': {
         const result = this.game.playCard(data.playerId ?? '', msg.cardId, msg.chosenColor);
         reply(result);
         this.broadcast();
+        await this.persist();
         return;
       }
       case 'drawCard': {
         reply(this.game.drawCard(data.playerId ?? ''));
         this.broadcast();
+        await this.persist();
         return;
       }
       case 'playDrawnCard': {
         reply(this.game.playDrawnCard(data.playerId ?? '', msg.play, msg.chosenColor));
         this.broadcast();
+        await this.persist();
         return;
       }
       case 'callUno': {
         reply(this.game.callUno(data.playerId ?? ''));
         this.broadcast();
+        await this.persist();
         return;
       }
       case 'callOutUno': {
         reply(this.game.callOutUno(data.playerId ?? '', msg.targetId));
         this.broadcast();
+        await this.persist();
         return;
       }
       case 'nextRound': {
         reply(this.game.nextRound());
         this.broadcast();
+        await this.persist();
         return;
       }
       case 'playAgain': {
         reply(this.game.playAgain());
         this.broadcast();
+        await this.persist();
         return;
       }
       case 'newGame': {
         this.game.reset();
         reply({ ok: true });
         this.broadcast();
+        await this.persist();
         return;
       }
     }

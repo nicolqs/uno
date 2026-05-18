@@ -36,7 +36,7 @@ export default function HostScreen({ state }: { state: GameState }) {
         </div>
         <div className="flex-1 overflow-y-auto flex flex-col gap-1 text-[13px]">
           {(state.events || []).map((e) => (
-            <div key={e.ts} className="px-2.5 py-1.5 bg-white/5 rounded-lg">
+            <div key={e.id} className="px-2.5 py-1.5 bg-white/5 rounded-lg">
               {e.text}
             </div>
           ))}

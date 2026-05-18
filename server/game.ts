@@ -9,6 +9,7 @@ import type {
   UnoVulnerable,
   AwaitingDrawnChoice,
   GameEvent,
+  GameSnapshot,
   RedactedState,
 } from './types.ts';
 
@@ -29,6 +30,7 @@ export class GameRoom {
   awaitingDrawnCardChoice: AwaitingDrawnChoice | null = null;
   unoVulnerable: UnoVulnerable | null = null;
   events: GameEvent[] = [];
+  eventSeq = 0;
   turnCount = 0;
   lastWinnerId: string | null = null;
 
@@ -50,12 +52,13 @@ export class GameRoom {
     this.awaitingDrawnCardChoice = null;
     this.unoVulnerable = null;
     this.events = [];
+    this.eventSeq = 0;
     this.turnCount = 0;
     this.lastWinnerId = null;
   }
 
   log(text: string): void {
-    this.events.unshift({ ts: Date.now(), text });
+    this.events.unshift({ id: ++this.eventSeq, ts: Date.now(), text });
     if (this.events.length > 30) this.events.length = 30;
   }
 
@@ -95,6 +98,14 @@ export class GameRoom {
     const p = this.players.find((x) => x.socketId === socketId);
     if (!p) return;
     p.connected = false;
+  }
+
+  relinkSocket(playerId: string, socketId: string): boolean {
+    const p = this.players.find((x) => x.id === playerId);
+    if (!p) return false;
+    p.socketId = socketId;
+    p.connected = true;
+    return true;
   }
 
   startGame(): { ok?: true; error?: string } {
@@ -379,6 +390,59 @@ export class GameRoom {
     this.lastWinnerId = null;
     this.startRound();
     return { ok: true };
+  }
+
+  snapshot(): GameSnapshot {
+    return {
+      v: 1,
+      phase: this.phase,
+      players: this.players,
+      drawPile: this.drawPile,
+      discardPile: this.discardPile,
+      activeColor: this.activeColor,
+      direction: this.direction,
+      currentPlayerIdx: this.currentPlayerIdx,
+      pendingDraw: this.pendingDraw,
+      pendingDrawType: this.pendingDrawType,
+      awaitingWildColor: this.awaitingWildColor,
+      awaitingDrawnCardChoice: this.awaitingDrawnCardChoice,
+      unoVulnerable: this.unoVulnerable,
+      events: this.events,
+      eventSeq: this.eventSeq,
+      turnCount: this.turnCount,
+      lastWinnerId: this.lastWinnerId,
+    };
+  }
+
+  restore(s: GameSnapshot): void {
+    if (!s || s.v !== 1) return;
+    this.phase = s.phase;
+    this.players = s.players;
+    this.drawPile = s.drawPile;
+    this.discardPile = s.discardPile;
+    this.activeColor = s.activeColor;
+    this.direction = s.direction;
+    this.currentPlayerIdx = s.currentPlayerIdx;
+    this.pendingDraw = s.pendingDraw;
+    this.pendingDrawType = s.pendingDrawType;
+    this.awaitingWildColor = s.awaitingWildColor;
+    this.awaitingDrawnCardChoice = s.awaitingDrawnCardChoice;
+    this.unoVulnerable = s.unoVulnerable;
+    this.events = s.events;
+    this.eventSeq = s.eventSeq ?? s.events.reduce((m, e) => Math.max(m, e.id ?? 0), 0);
+    this.turnCount = s.turnCount;
+    this.lastWinnerId = s.lastWinnerId;
+  }
+
+  syncConnectivity(aliveSocketIds: Set<string>): void {
+    for (const p of this.players) {
+      if (p.socketId && aliveSocketIds.has(p.socketId)) {
+        p.connected = true;
+      } else {
+        p.connected = false;
+        p.socketId = null;
+      }
+    }
   }
 
   redactedStateFor(playerId: string | null): RedactedState {

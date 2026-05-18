@@ -33,6 +33,7 @@ export interface AwaitingDrawnChoice {
 }
 
 export interface GameEvent {
+  id: number;
   ts: number;
   text: string;
 }
@@ -50,6 +51,26 @@ export interface LanInfo {
   lan: string;
   playerUrl: string;
   hostUrl?: string;
+}
+
+export interface GameSnapshot {
+  v: 1;
+  phase: Phase;
+  players: Player[];
+  drawPile: Card[];
+  discardPile: Card[];
+  activeColor: CardColor | null;
+  direction: 1 | -1;
+  currentPlayerIdx: number;
+  pendingDraw: number;
+  pendingDrawType: PendingDrawType;
+  awaitingWildColor: boolean;
+  awaitingDrawnCardChoice: AwaitingDrawnChoice | null;
+  unoVulnerable: UnoVulnerable | null;
+  events: GameEvent[];
+  eventSeq: number;
+  turnCount: number;
+  lastWinnerId: string | null;
 }
 
 export interface RedactedState {
