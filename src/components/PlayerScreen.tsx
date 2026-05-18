@@ -107,7 +107,7 @@ export default function PlayerScreen({ state }: { state: GameState }) {
     if (r.error) flashError(r.error);
   };
 
-  const showCallUno = myHand.length > 0 && myHand.length <= 2 && !me.hasCalledUno;
+  const showCallUno = myHand.length === 1 && !me.hasCalledUno;
   const callOutTargets = state.players.filter(
     (p) => state.unoVulnerable === p.id && p.id !== me.id,
   );

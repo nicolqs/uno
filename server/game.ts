@@ -341,7 +341,7 @@ export class GameRoom {
   callUno(playerId: string): { ok?: true; error?: string } {
     const player = this.players.find((p) => p.id === playerId);
     if (!player) return { error: 'Unknown player' };
-    if (player.hand.length > 2) return { error: 'Too many cards to call UNO' };
+    if (player.hand.length !== 1) return { error: 'Call UNO only when you have 1 card left' };
     player.hasCalledUno = true;
     if (this.unoVulnerable && this.unoVulnerable.playerId === playerId) {
       this.unoVulnerable = null;
